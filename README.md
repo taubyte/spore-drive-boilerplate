@@ -39,6 +39,7 @@ Creating a custom cloud platform brings powerful advantages—cost savings, full
    NAMECHEAP_API_KEY=your_api_key
    NAMECHEAP_IP=your_ip
    NAMECHEAP_USERNAME=your_username
+   # NAMECHEAP_DOMAIN=example.com   # Optional: zone apex override (ROOT_DOMAIN must be this or a subdomain); if unset, zone is discovered via SOA
    ```
 
 4. **Deploy**  

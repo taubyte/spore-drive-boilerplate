@@ -13,6 +13,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { getServersFromCSV } from "./csv";
+import { resolveZoneApexBySoa } from "./dns";
 import NamecheapDnsClient from "./namecheap";
 
 import { fileURLToPath } from "url";
@@ -154,10 +155,28 @@ export const fixDNS = async (config: Config): Promise<boolean> => {
 
   if (!apiUser && !apiKey && !clientIp) {
     return false; // skip
-  } else if (!apiUser || !apiKey || !clientIp) {
+  }
+  if (!apiUser || !apiKey || !clientIp) {
     throw new Error(
       "Environment variables NAMECHEAP_USERNAME, NAMECHEAP_API_KEY, and NAMECHEAP_IP must be set"
     );
+  }
+
+  // Zone apex for Namecheap API (may be rootDomain or a parent zone discovered via SOA)
+  let namecheapDomain: string;
+  const envNamecheapDomain = process.env.NAMECHEAP_DOMAIN;
+  if (envNamecheapDomain) {
+    namecheapDomain = envNamecheapDomain;
+    const valid =
+      rootDomain === namecheapDomain ||
+      rootDomain.endsWith("." + namecheapDomain);
+    if (!valid) {
+      throw new Error(
+        `ROOT_DOMAIN (${rootDomain}) must be equal to or a subdomain of NAMECHEAP_DOMAIN (${namecheapDomain})`
+      );
+    }
+  } else {
+    namecheapDomain = await resolveZoneApexBySoa(rootDomain);
   }
 
   const seerAddrs = [];
@@ -174,7 +193,7 @@ export const fixDNS = async (config: Config): Promise<boolean> => {
     apiUser,
     apiKey,
     clientIp,
-    rootDomain,
+    namecheapDomain,
     false
   );
 
@@ -192,6 +211,15 @@ export const fixDNS = async (config: Config): Promise<boolean> => {
   ]);
 
   await client.commit();
+
+  console.log("DNS changes applied:", {
+    zone: namecheapDomain,
+    records: {
+      "seer A": seerAddrs,
+      "tau NS": [`seer.${rootDomain}.`],
+      [`*.${generatedPrefix} CNAME`]: [`substrate.tau.${rootDomain}.`],
+    },
+  });
 
   return true;
 };
