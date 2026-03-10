@@ -179,6 +179,15 @@ export const fixDNS = async (config: Config): Promise<boolean> => {
     namecheapDomain = await resolveZoneApexBySoa(rootDomain);
   }
 
+  const generatedUnderZone =
+    generatedDomain === namecheapDomain ||
+    generatedDomain.endsWith("." + namecheapDomain);
+  if (!generatedUnderZone) {
+    throw new Error(
+      `Though tau and spore-drive support it, this project does not: GENERATED_DOMAIN (${generatedDomain}) must be equal to or a subdomain of the Namecheap zone (${namecheapDomain}).`
+    );
+  }
+
   const seerAddrs = [];
   for (const hostname of await config.hosts.list()) {
     if ((await config.hosts.get(hostname).shapes.list()).includes("all")) {
@@ -199,27 +208,38 @@ export const fixDNS = async (config: Config): Promise<boolean> => {
 
   await client.init();
 
-  client.setAll("seer", "A", seerAddrs);
+  // Host names are relative to the zone (namecheapDomain). When rootDomain is a subdomain (e.g. tau.example.com), we must use "seer.tau" / "tau.tau" in zone example.com.
+  const subPrefix =
+    rootDomain === namecheapDomain
+      ? ""
+      : rootDomain.slice(0, rootDomain.length - namecheapDomain.length - 1);
+  const seerHost = subPrefix ? `seer.${subPrefix}` : "seer";
+  const tauHost = subPrefix ? `tau.${subPrefix}` : "tau";
+  const wildcardHost = subPrefix
+    ? `*.${generatedPrefix}.${subPrefix}`
+    : `*.${generatedPrefix}`;
 
-  client.setAll("tau", "NS", [
-    `seer.${rootDomain}.`,
-  ]);
+  client.setAll(seerHost, "A", seerAddrs);
+
+  client.setAll(tauHost, "NS", [`seer.${rootDomain}.`]);
 
   // Wildcard CNAME for generated domain (e.g., *.g -> substrate.tau.rootDomain)
-  client.setAll(`*.${generatedPrefix}`, "CNAME", [
-    `substrate.tau.${rootDomain}.`,
-  ]);
+  client.setAll(wildcardHost, "CNAME", [`substrate.tau.${rootDomain}.`]);
 
   await client.commit();
 
-  console.log("DNS changes applied:", {
-    zone: namecheapDomain,
-    records: {
-      "seer A": seerAddrs,
-      "tau NS": [`seer.${rootDomain}.`],
-      [`*.${generatedPrefix} CNAME`]: [`substrate.tau.${rootDomain}.`],
-    },
-  });
+  const TTL = "1800";
+  const zoneLines: string[] = [
+    `$ORIGIN ${namecheapDomain}.`,
+    "",
+    ...seerAddrs.map(
+      (addr) =>
+        `${seerHost}.${namecheapDomain}.  ${TTL}  IN  A  ${addr}`
+    ),
+    `${tauHost}.${namecheapDomain}.  ${TTL}  IN  NS  seer.${rootDomain}.`,
+    `${wildcardHost}.${namecheapDomain}.  ${TTL}  IN  CNAME  substrate.tau.${rootDomain}.`,
+  ];
+  console.log("DNS changes applied (zone format):\n" + zoneLines.join("\n"));
 
   return true;
 };
