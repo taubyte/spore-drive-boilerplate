@@ -48,6 +48,21 @@ Creating a custom cloud platform brings powerful advantages—cost savings, full
    npm run displace
    ```
 
+## Tenancy (required)
+
+Every cloud needs a tenancy: the GitHub user or organization that owns it. Without one, Spore Drive stops before touching any server, and nodes running the auth service won't start.
+
+Create `config/tenancy.yaml` in this project before running `npm run displace`:
+
+```yaml
+provider: github
+owner: your-github-user-or-org
+```
+
+An app is optional. With only an owner, the cloud runs as a single account.
+
+This needs a `@taubyte/spore-drive` release with tenancy support (v1.3.0 or later). Local Dream clouds don't need a tenancy.
+
 ## CSV File Format
 
 The servers CSV file should contain the following columns:
