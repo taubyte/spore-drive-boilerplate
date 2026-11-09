@@ -59,9 +59,20 @@ provider: github
 owner: your-github-user-or-org
 ```
 
-An app is optional. With only an owner, the cloud runs as a single account.
+For a GitHub user, that is all. For an organization, the cloud has to ask GitHub who belongs to it, so `app` is required: with only an owner, an organization admits nobody. Add the credentials of a GitHub App installed on the organization:
 
-This needs a `@taubyte/spore-drive` release with tenancy support (v1.3.0 or later). Local Dream clouds don't need a tenancy.
+```yaml
+provider: github
+owner: your-github-org
+app:
+  client-id: your-github-app-client-id
+  key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    ...the app's private key, PEM inline...
+    -----END RSA PRIVATE KEY-----
+```
+
+This needs a `@taubyte/spore-drive` release with tenancy support (0.1.12 or later). Local Dream clouds don't need a tenancy.
 
 ## CSV File Format
 
